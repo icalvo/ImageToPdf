@@ -3,7 +3,6 @@ using System.CommandLine.Invocation;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
-using QuestPDF.Previewer;
 
 QuestPDF.Settings.License = LicenseType.Community;
 
@@ -64,24 +63,8 @@ void Handle(InvocationContext context)
     var outputFile = context.ParseResult.GetValueForOption(outputOption)!;
     var watermark = context.ParseResult.GetValueForOption(watermarkOption);
     var headerText = context.ParseResult.GetValueForOption(headerTextOption);
-    var isPreview = context.ParseResult.GetValueForOption(isPreviewOption);
 
-    var doc = GenerateDocument(inputFiles, watermark, headerText);
-
-    if (isPreview)
-    {
-        try
-        {
-            doc.ShowInPreviewer();
-        }
-        catch (TaskCanceledException)
-        {
-        }
-    }
-    else
-    {
-        doc.GeneratePdf(outputFile.FullName);
-    }
+    doc.GeneratePdf(outputFile.FullName);
 }
 
 static Document GenerateDocument(IEnumerable<FileInfo> files, string? watermark, string? headerText)

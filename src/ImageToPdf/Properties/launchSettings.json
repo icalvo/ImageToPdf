@@ -4,6 +4,11 @@
       "commandName": "Project",
       "commandLineArgs": "-h",
       "hotReloadEnabled": false
+    },
+    "xxx": {
+      "commandName": "Project",
+      "commandLineArgs": "-f \"D:\\Dropbox\\Ignacio\\Sync\\Documents\\Amoeba 2 portion.bmp\" -m 5mm --fit OriginalImage",
+      "hotReloadEnabled": false
     }
   }
 }

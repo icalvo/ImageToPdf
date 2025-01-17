@@ -4,71 +4,66 @@
 This tool uses an excellent library for generating pdf files called [QuestPDF](https://www.questpdf.com/).
 
 ## Installation
+# 🖼->📄 img2pdf
 
 To install this tool, please execute the following command on your PC:
 
 ```
-dotnet tool install Algel.ImageToPdf --global
+dotnet tool install img2pdf --global
 ```
 
 To update the tool, please use:
 
 ```
-dotnet tool update Algel.ImageToPdf --global
+dotnet tool update img2pdf --global
 ```
 
 And to remove:
 
 ```
-dotnet tool uninstall Algel.ImageToPdf --global
+dotnet tool uninstall img2pdf --global
 ```
 
 ## Usage
 
-You car run:
+You can run:
 ```
-algel.imageToPdf -h
+img2pdf -h
 ```
 
 to show help:
 
 ```
 Description:
-  Convert images to single PDF file
+  Converts an image to a PDF file
 
 Usage:
-  Algel.ImageToPdf [options]
+  img2pdf <File> [options]
+
+Arguments:
+  <File>  Path to the file.
 
 Options:
-  -f, --file <file> (REQUIRED)  Path to the file (required). Allow multiple files.
-  -o, --output <output>         Path to save generated file [default: generated.pdf]
-  -w, --watermark <watermark>   Watermark text (optional)
-  --header <header>             Page header text (optional)
-  --preview                     Show preview without saving [default: False]
-  --version                     Show version information
-  -?, -h, --help                Show help and usage information
+  -o, --output <output>                 Path to save generated file [default: generated.pdf]
+  -m, --margin <margin>                 Margin size [default: 5mmx5mm]
+  -w, --width <width>                   Image width. This is one of the ways of indicating the physical width of the image (the other is --resolution)
+  -r, --resolution <resolution>         Resolution in dots per inch. This is one of the ways of indicating the image width in the page. It assumes that each pixel is a printer point   
+                                        and uses the printer resolution to deduce the physical width.
+  --watermark <watermark>               Watermark text (optional)
+  --header <header>                     Page header text (optional)
+  -p, --pagesize <pagesize> (REQUIRED)  Page size ('a4' or '10cmx15cm')
+  --version                             Show version information
+  -?, -h, --help                        Show help and usage information
 ```
 
-For example, we have a catalog with three images: 1.png, 2.jpg, 3.png
+For example, we have an image: `1.png`
 Executing the command:
 ```
-algel.imageToPdf -f 1.png -f 2.jpg -f 3.png
+algel.imageToPdf 1.png -p a4 -r 300
 ```
-will create a generated.pdf file with three pages that contain the listed images
+will create a `generated.pdf` file with an A4 page that contains the image at 300 pixels per inch.
 
-It can also be simplified:
-```
-algel.imageToPdf -f 1.png 2.jpg 3.png
-```
 Optionally a watermark can be set:
 ```
-algel.imageToPdf -f 1.png 2.jpg 3.png -w "my watermark"
-```
-It is also possible to preview the created document without saving it to a drive:
-```
-algel.imageToPdf -f 1.png 2.jpg 3.png -w "my watermark" --preview
-```
-But for this to work, you must first install the [QuestPDF Previewer](https://www.questpdf.com/document-previewer.html) tool
-```
-dotnet tool install QuestPDF.Previewer --global
+algel.imageToPdf 1.png -w "my watermark"
 ```

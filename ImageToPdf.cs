@@ -1,110 +1,117 @@
-﻿using System.CommandLine;
-using System.CommandLine.Invocation;
+﻿#:package QuestPDF@*
+#:package SkiaSharp@*
+#:package System.CommandLine@2.*
+
+using System.CommandLine;
 using System.CommandLine.Parsing;
 using System.Reflection;
 using System.Text.RegularExpressions;
+using ImageToPdf;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 using SkiaSharp;
 
-QuestPDF.Settings.License = LicenseType.Community;
-
-var fileArgument = new Argument<FileInfo>(
-    "File",
-    "Path to the file.")
+// QuestPDF.Settings.License = LicenseType.Community;
+var fileArgument = new Argument<FileInfo>("File")
 {
+    Description = "Path to the file.",
     Arity = ArgumentArity.ExactlyOne
 };
-fileArgument.LegalFilePathsOnly();
-fileArgument.AddValidator(result =>
+fileArgument.AcceptLegalFilePathsOnly();
+fileArgument.Validators.Add(result =>
 {
-    var file = result.GetValueForArgument(fileArgument);
+    var file = result.GetRequiredValue(fileArgument);
     if (!file.Exists)
     {
-        result.ErrorMessage = $"The file '{file.Name}' was not found.";
+        result.AddError($"The file '{file.Name}' was not found.");
     }
 });
 
-var outputOption = new Option<FileInfo>(["--output", "-o"], () => new FileInfo("generated.pdf"))
+var outputOption = new Option<FileInfo>("--output", ["-o"])
 {
+    DefaultValueFactory = _ => new FileInfo("generated.pdf"),
     Arity = ArgumentArity.ExactlyOne,
     Description = "Path to save generated file"
 };
-outputOption.LegalFilePathsOnly();
+outputOption.AcceptLegalFilePathsOnly();
 
-var pageSizeOption = new Option<PageSize?>(["--pagesize", "-p"], ParsePageSize, isDefault:false)
+var pageSizeOption = new Option<PageSize>("--pagesize", ["-p"])
 {
+    CustomParser = ParsePageSize,
     Arity = ArgumentArity.ExactlyOne,
-    IsRequired = true,
+    Required = true,
     Description = "Page size ('a4' or '10cmx15cm')"
 };
 
-var marginOption = new Option<Rectangle?>(["--margin", "-m"], ParseMargin, isDefault:true)
+var marginOption = new Option<Rectangle?>("--margin", ["-m"])
 {
+    CustomParser = ParseMargin,
     Arity = ArgumentArity.ZeroOrOne,
     Description = "Margin size"
 };
-var widthOption = new Option<Length?>(["--width", "-w"], ParseDimension)
+var widthOption = new Option<Length?>("--width", ["-w"])
 {
+    CustomParser = ParseDimension,
     Arity = ArgumentArity.ZeroOrOne,
     Description = "Image width. This is one of the ways of indicating the physical width of the image (the other is --resolution)"
 };
-var resolutionOption = new Option<int?>(["--resolution", "-r"])
+var resolutionOption = new Option<int?>("--resolution", ["-r"])
 {
     Arity = ArgumentArity.ZeroOrOne,
     Description = "Resolution in dots per inch. This is one of the ways of indicating the image width in the page. It assumes that each pixel is a printer point and uses the printer resolution to deduce the physical width."
 };
 
-var watermarkOption = new Option<string>("--watermark")
+var watermarkOption = new Option<string?>("--watermark")
 {
     Arity = ArgumentArity.ZeroOrOne,
-    IsRequired = false,
+    Required = false,
     Description = "Watermark text (optional)"
 };
 
-var headerTextOption = new Option<string>(
-    "--header",
-    "Page header text (optional)")
+var headerTextOption = new Option<string?>(
+    "--header")
 {
+    Description = "Page header text (optional)",
     Arity = ArgumentArity.ZeroOrOne,
-    IsRequired = false,
+    Required = false,
 };
 
 
 var rootCommand = new RootCommand("Convert images to single PDF file");
-rootCommand.AddArgument(fileArgument);
-rootCommand.AddOption(outputOption);
-rootCommand.AddOption(marginOption);
-rootCommand.AddOption(widthOption);
-rootCommand.AddOption(resolutionOption);
-rootCommand.AddOption(watermarkOption);
-rootCommand.AddOption(headerTextOption);
-rootCommand.AddOption(pageSizeOption);
-rootCommand.SetHandler(Handle);
+rootCommand.Arguments.Add(fileArgument);
+rootCommand.Options.Add(outputOption);
+rootCommand.Options.Add(marginOption);
+rootCommand.Options.Add(widthOption);
+rootCommand.Options.Add(resolutionOption);
+rootCommand.Options.Add(watermarkOption);
+rootCommand.Options.Add(headerTextOption);
+rootCommand.Options.Add(pageSizeOption);
+rootCommand.SetAction(Handle);
 
-try
-{
-    await rootCommand.InvokeAsync(args);
-}
-catch (Exception ex)
-{
-    Console.Error.WriteLine(ex.Message);
-    return 1;
-}
+await rootCommand.Parse(args).InvokeAsync();
+// try
+// {
+//     await rootCommand.Parse(args).InvokeAsync();
+// }
+// catch (Exception ex)
+// {
+//     Console.Error.WriteLine(ex.Message);
+//     return 1;
+// }
 
 return 0;
 
-void Handle(InvocationContext context)
+void Handle(ParseResult parseResult)
 {
-    var inputFile = context.ParseResult.GetValueForArgument(fileArgument);
-    var outputFile = context.ParseResult.GetValueForOption(outputOption)!;
-    var watermark = context.ParseResult.GetValueForOption(watermarkOption);
-    var headerText = context.ParseResult.GetValueForOption(headerTextOption);
-    var marginSize = context.ParseResult.GetValueForOption(marginOption);
-    var resolution = context.ParseResult.GetValueForOption(resolutionOption);
-    var width = context.ParseResult.GetValueForOption(widthOption);
-    var pageSize = context.ParseResult.GetValueForOption(pageSizeOption)!;
+    var inputFile = parseResult.GetRequiredValue(fileArgument);
+    var outputFile = parseResult.GetRequiredValue(outputOption);
+    var watermark = parseResult.GetValue(watermarkOption);
+    var headerText = parseResult.GetValue(headerTextOption);
+    var marginSize = parseResult.GetValue(marginOption);
+    var resolution = parseResult.GetValue(resolutionOption);
+    var width = parseResult.GetValue(widthOption);
+    var pageSize = parseResult.GetRequiredValue(pageSizeOption);
 
     Length finalWidth = (resolution, width) switch
     {
@@ -113,18 +120,15 @@ void Handle(InvocationContext context)
         (null, _) => width,
         _ => throw new Exception("Need only one of --resolution of --width")
     };
-
+    Console.WriteLine("Final width: " + finalWidth);
     var doc = GenerateDocument(inputFile, watermark, headerText, marginSize, finalWidth, pageSize);
     doc.GeneratePdf(outputFile.FullName);
 }
 
 static Document GenerateDocument(FileInfo file, string? watermark, string? headerText, Rectangle? marginSize, Length width, PageSize pageSize)
-{
-    return Document.Create(container =>
-    {
-        container.Page(page => FillPage(page, file.FullName, headerText, watermark, marginSize, width, pageSize));
-    });
-}
+    => Document.Create(container =>
+       container.Page(page =>
+           FillPage(page, file.FullName, headerText, watermark, marginSize, width, pageSize)));
 
 static void FillPage(PageDescriptor page, string filePath, string? headerText, string? watermark, Rectangle? marginSize, Length width, PageSize pageSize)
 {
@@ -184,7 +188,7 @@ static PageSize? ParsePageSize(ArgumentResult result)
 
     if (result.Tokens.Count > 2)
     {
-        result.ErrorMessage = "Need a page size such as a4 or 10cmx15cm";
+        result.AddError("Need a page size such as a4 or 10cmx15cm");
         return null;
     }
 
@@ -192,7 +196,7 @@ static PageSize? ParsePageSize(ArgumentResult result)
     {
         var ps = result.Tokens[0].Value;
         if (PageSizeConversion.ByName.TryGetValue(ps, out var pageSize)) return pageSize;
-        result.ErrorMessage = "Incorrect page size";
+        result.AddError("Incorrect page size");
         return null;
     }
 
@@ -213,7 +217,7 @@ static Rectangle? ParseRectangle(ArgumentResult result)
 {
     if (result.Tokens.Count != 1)
     {
-        result.ErrorMessage = "Need a rectangle size such as 10cmx15cm";
+        result.AddError("Need a rectangle size such as 10cmx15cm");
         return null;
     }
 
@@ -223,13 +227,13 @@ static Rectangle? ParseRectangle(ArgumentResult result)
 
     if (message1 != null || message2 != null)
     {
-        result.ErrorMessage = string.Join(". ", message1, message2);
+        result.AddError(string.Join(". ", message1, message2));
         return null;
     }
 
     if (length1!.Unit != length2!.Unit)
     {
-        result.ErrorMessage = "Units must be the same";
+        result.AddError("Units must be the same");
         return null;
     }
 
@@ -245,16 +249,16 @@ static Length? ParseDimension(ArgumentResult result)
 
     if (result.Tokens.Count != 1)
     {
-        result.ErrorMessage = "Need a dimension such as 15cm";
+        result.AddError("Need a dimension such as 15cm");
         return null;
     }
 
     var dim = result.Tokens[0].Value;
-    var regex = new Regex("^[0-9]+");
+    var regex = Regexes.NumberPrefixRegex();
     var quantityMatch = regex.Match(dim);
     if (!quantityMatch.Success)
     {
-        result.ErrorMessage = "Dimension must have a quantity";
+        result.AddError("Dimension must have a quantity");
         return null;
     }
 
@@ -264,8 +268,8 @@ static Length? ParseDimension(ArgumentResult result)
 
     if (!UnitConversion.UnitMap2.TryGetValue(unitMatch, out var unit))
     {
-        result.ErrorMessage = "Invalid unit, must be one of " + string.Join(",", UnitConversion.UnitMap2.Keys);
-        
+        result.AddError("Invalid unit, must be one of " + string.Join(",", UnitConversion.UnitMap2.Keys));
+
         return null;
     }
 
@@ -274,7 +278,7 @@ static Length? ParseDimension(ArgumentResult result)
 
 static (Length?, string?) ParseDimensionAux(string dim)
 {
-    var regex = new Regex("^[0-9]+");
+    var regex = Regexes.NumberPrefixRegex();
     var quantityMatch = regex.Match(dim);
     if (!quantityMatch.Success)
     {
@@ -293,68 +297,77 @@ static (Length?, string?) ParseDimensionAux(string dim)
     return (new Length(quantity, unit), null);
 }
 
-static class UnitConversion
+namespace ImageToPdf
 {
-    public static readonly Dictionary<Unit, string> UnitMap = new ()
+    static class UnitConversion
+    {
+        public static readonly Dictionary<Unit, string> UnitMap = new()
     {
         { Unit.Centimetre, "cm" },
         { Unit.Point, "pt" },
         { Unit.Millimetre, "mm" },
         { Unit.Meter, "m" },
         { Unit.Inch, "in" },
-        { Unit.Mil, "mil" },
+        { Unit.Mill, "mil" },
         { Unit.Feet, "ft" },
     };
-    static UnitConversion()
-    {
-        UnitMap2 = new();
-        foreach (var unit in Enum.GetValues<Unit>())
+        static UnitConversion()
         {
-            UnitMap2.Add(UnitMap[unit], unit);
+            UnitMap2 = [];
+            foreach (var unit in Enum.GetValues<Unit>())
+            {
+                UnitMap2.Add(UnitMap[unit], unit);
+            }
+        }
+        public static readonly Dictionary<string, Unit> UnitMap2;
+    }
+
+    static class PageSizeConversion
+    {
+        static PageSizeConversion()
+        {
+
+            ByName = [];
+            var pageSizeProps =
+                typeof(PageSizes)
+                    .GetProperties(BindingFlags.Public | BindingFlags.Static)
+                    .Where(prop => prop.PropertyType == typeof(PageSize));
+
+
+            foreach (var pageSizeProp in pageSizeProps)
+            {
+                ByName.Add(pageSizeProp.Name.ToLowerInvariant(), (PageSize)pageSizeProp.GetValue(null)!);
+            }
+        }
+
+        public static readonly Dictionary<string, PageSize> ByName;
+    }
+    record Length(float Quantity, Unit Unit)
+    {
+        public override string ToString()
+        {
+
+            return $"{Quantity}{UnitConversion.UnitMap[Unit]}";
         }
     }
-    public static readonly Dictionary<string, Unit> UnitMap2;
-}
 
-static class PageSizeConversion
-{
-    static PageSizeConversion()
+    record Rectangle(float Width, float Height, Unit Unit)
     {
-
-        ByName = new();
-        var pageSizeProps =
-            typeof(PageSizes)
-                .GetProperties(BindingFlags.Public | BindingFlags.Static)
-                .Where(prop => prop.PropertyType == typeof(PageSize));
-        
-        
-        foreach (var pageSizeProp in pageSizeProps)
+        public override string ToString()
         {
-            ByName.Add(pageSizeProp.Name.ToLowerInvariant(), (PageSize)pageSizeProp.GetValue(null)!);
+
+            return $"{Width}{UnitConversion.UnitMap[Unit]}x{Height}{UnitConversion.UnitMap[Unit]}";
+        }
+
+        public PageSize ToPageSize()
+        {
+            return new PageSize(Width, Height, Unit);
         }
     }
 
-    public static readonly Dictionary<string, PageSize> ByName;
-}
-record Length(float Quantity, Unit Unit)
-{
-    public override string ToString()
+    partial class Regexes
     {
-        
-        return $"{Quantity}{UnitConversion.UnitMap[Unit]}";
-    }
-}
-
-record Rectangle(float Width, float Height, Unit Unit)
-{
-    public override string ToString()
-    {
-        
-        return $"{Width}{UnitConversion.UnitMap[Unit]}x{Height}{UnitConversion.UnitMap[Unit]}";
-    }
-
-    public PageSize ToPageSize()
-    {
-        return new PageSize(Width, Height, Unit);
+        [GeneratedRegex("^[0-9]+")]
+        public static partial Regex NumberPrefixRegex();
     }
 }

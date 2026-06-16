@@ -1,0 +1,55 @@
+# ImageToPdf
+
+.Net global tool for convert images to PDF document
+
+This tool uses an excellent library for generating pdf files called [QuestPDF](https://www.questpdf.com/).
+
+## Installation
+
+To install this tool, please execute the following command on your PC:
+
+```
+dotnet tool install ImageToPdf --global
+```
+
+To update the tool, please use:
+
+```
+dotnet tool update ImageToPdf --global
+```
+
+And to remove:
+
+```
+dotnet tool uninstall ImageToPdf --global
+```
+
+## Usage
+
+You can run:
+
+```
+imgtopdf -h
+```
+
+to show help:
+
+```
+[[HELP]]
+```
+
+For example, we have an image: `1.png`
+Executing the command:
+
+```
+imagetopdf 1.png -p a4 -m 1cmx1cm -r 300
+```
+
+will create a `generated.pdf` file with an A4 page that contains the image at 300 pixels per inch, position at 1cm of the page borders.
+
+Optionally a watermark can be set:
+
+```
+imagetopdf 1.png -p a4 -m 1cmx1cm -r 300
+```
+

@@ -4,10 +4,6 @@ name: Publish to nuget
 
 # Controls when the workflow will run
 on:
-  # Triggers the workflow on push or pull request events but only for the "main" branch
-  push:
-    branches: [ "main" ]
-
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
@@ -16,7 +12,7 @@ jobs:
   # This workflow contains a single job called "build-and-publish"
   build-and-publish:
     permissions:
-      id-token: write  # enable GitHub OIDC token issuance for this job
+      id-token: write # enable GitHub OIDC token issuance for this job
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
 
@@ -31,14 +27,13 @@ jobs:
           dotnet-version: 10.0.x
       - name: Pack
         run: dotnet pack -c Release ImageToPdf.cs -o .
-            
+
       # Get a short-lived NuGet API key
       - name: NuGet login (OIDC → temp API key)
         uses: NuGet/login@v1
         id: login
         with:
           user: ${{ secrets.NUGET_USER }}
-    
+
       - name: Publish NuGet
         run: dotnet nuget push *.nupkg --api-key ${{steps.login.outputs.NUGET_API_KEY}} --source "https://api.nuget.org/v3/index.json" --skip-duplicate
-        

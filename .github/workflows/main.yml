@@ -13,8 +13,10 @@ on:
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
-  build:
+  # This workflow contains a single job called "build-and-publish"
+  build-and-publish:
+    permissions:
+      id-token: write  # enable GitHub OIDC token issuance for this job
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
 
@@ -26,13 +28,17 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v1
         with:
-          dotnet-version: 7.0.x
-      - name: Restore dependencies
-        run: dotnet restore src/ImageToPdf.sln
-      - name: Build
-        run: dotnet build --no-restore -c Release src/ImageToPdf.sln
+          dotnet-version: 10.0.x
       - name: Pack
-        run: dotnet pack --no-build -c Release src/ImageToPdf/ImageToPdf.csproj -o .
+        run: dotnet pack -c Release ImageToPdf.cs -o .
+            
+      # Get a short-lived NuGet API key
+      - name: NuGet login (OIDC → temp API key)
+        uses: NuGet/login@v1
+        id: login
+        with:
+          user: ${{ secrets.NUGET_USER }}
+    
       - name: Publish NuGet
-        run: dotnet nuget push *.nupkg --api-key ${{secrets.NUGET_API_KEY}} --source "https://api.nuget.org/v3/index.json" --skip-duplicate
+        run: dotnet nuget push *.nupkg --api-key ${{steps.login.outputs.NUGET_API_KEY}} --source "https://api.nuget.org/v3/index.json" --skip-duplicate
         

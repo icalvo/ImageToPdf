@@ -1,4 +1,5 @@
-﻿#:package QuestPDF@*
+﻿#:property PackageLicenseExpression=MIT
+#:package QuestPDF@*
 #:package SkiaSharp@*
 #:package System.CommandLine@*
 

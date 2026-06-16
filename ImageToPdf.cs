@@ -1,8 +1,10 @@
 ﻿#:package QuestPDF@*
 #:package SkiaSharp@*
-#:package System.CommandLine@2.*
+#:package System.CommandLine@*
 
 using System.CommandLine;
+using System.CommandLine.Help;
+using System.CommandLine.Invocation;
 using System.CommandLine.Parsing;
 using System.Reflection;
 using System.Text.RegularExpressions;
@@ -41,14 +43,15 @@ var pageSizeOption = new Option<PageSize>("--pagesize", ["-p"])
     CustomParser = ParsePageSize,
     Arity = ArgumentArity.ExactlyOne,
     Required = true,
-    Description = "Page size ('a4' or '10cmx15cm')"
+    Description = "Page size. Can be a standard name like 'a4' (see available below) or custom width and height (e.g. 20cmx30cm, see available units below)"
 };
 
-var marginOption = new Option<Rectangle?>("--margin", ["-m"])
+var marginOption = new Option<Rectangle>("--margin", ["-m"])
 {
     CustomParser = ParseMargin,
-    Arity = ArgumentArity.ZeroOrOne,
-    Description = "Margin size"
+    Arity = ArgumentArity.ExactlyOne,
+    Required = true,
+    Description = "Left and top margin sizes, to position the image (e.g. '5mmx7mm', see available units below)"
 };
 var widthOption = new Option<Length?>("--width", ["-w"])
 {
@@ -59,7 +62,7 @@ var widthOption = new Option<Length?>("--width", ["-w"])
 var resolutionOption = new Option<int?>("--resolution", ["-r"])
 {
     Arity = ArgumentArity.ZeroOrOne,
-    Description = "Resolution in dots per inch. This is one of the ways of indicating the image width in the page. It assumes that each pixel is a printer point and uses the printer resolution to deduce the physical width."
+    Description = "Resolution in dots per inch. This is one of the ways of indicating the image width in the page (the other is --width). It assumes that each pixel is a printer point and uses the printer resolution to deduce the physical width."
 };
 
 var watermarkOption = new Option<string?>("--watermark")
@@ -89,16 +92,11 @@ rootCommand.Options.Add(headerTextOption);
 rootCommand.Options.Add(pageSizeOption);
 rootCommand.SetAction(Handle);
 
+var defaultHelpOption = rootCommand.Options.OfType<HelpOption>().FirstOrDefault();
+if (defaultHelpOption?.Action is HelpAction dha)
+    defaultHelpOption.Action = new CustomHelpAction(dha);
+
 await rootCommand.Parse(args).InvokeAsync();
-// try
-// {
-//     await rootCommand.Parse(args).InvokeAsync();
-// }
-// catch (Exception ex)
-// {
-//     Console.Error.WriteLine(ex.Message);
-//     return 1;
-// }
 
 return 0;
 
@@ -108,7 +106,7 @@ void Handle(ParseResult parseResult)
     var outputFile = parseResult.GetRequiredValue(outputOption);
     var watermark = parseResult.GetValue(watermarkOption);
     var headerText = parseResult.GetValue(headerTextOption);
-    var marginSize = parseResult.GetValue(marginOption);
+    var marginSize = parseResult.GetRequiredValue(marginOption);
     var resolution = parseResult.GetValue(resolutionOption);
     var width = parseResult.GetValue(widthOption);
     var pageSize = parseResult.GetRequiredValue(pageSizeOption);
@@ -125,23 +123,16 @@ void Handle(ParseResult parseResult)
     doc.GeneratePdf(outputFile.FullName);
 }
 
-static Document GenerateDocument(FileInfo file, string? watermark, string? headerText, Rectangle? marginSize, Length width, PageSize pageSize)
+static Document GenerateDocument(FileInfo file, string? watermark, string? headerText, Rectangle marginSize, Length width, PageSize pageSize)
     => Document.Create(container =>
        container.Page(page =>
            FillPage(page, file.FullName, headerText, watermark, marginSize, width, pageSize)));
 
-static void FillPage(PageDescriptor page, string filePath, string? headerText, string? watermark, Rectangle? marginSize, Length width, PageSize pageSize)
+static void FillPage(PageDescriptor page, string filePath, string? headerText, string? watermark, Rectangle marginSize, Length width, PageSize pageSize)
 {
     page.Size(pageSize);
-    if (marginSize == null)
-    {
-        page.Margin(5);
-    }
-    else
-    {
-        page.MarginTop(marginSize.Height, marginSize.Unit);
-        page.MarginLeft(marginSize.Width, marginSize.Unit);
-    }
+    page.MarginTop(marginSize.Height, marginSize.Unit);
+    page.MarginLeft(marginSize.Width, marginSize.Unit);
 
     FillHeader(page, headerText);
 
@@ -369,5 +360,22 @@ namespace ImageToPdf
     {
         [GeneratedRegex("^[0-9]+")]
         public static partial Regex NumberPrefixRegex();
+    }
+    internal class CustomHelpAction(HelpAction action) : SynchronousCommandLineAction
+    {
+        public override int Invoke(ParseResult parseResult)
+        {
+            int result = action.Invoke(parseResult);
+
+            Console.WriteLine("Standard page sizes:");
+            Console.WriteLine(string.Join(", ", PageSizeConversion.ByName.Keys));
+            Console.WriteLine();
+            Console.WriteLine("Measure units:");
+            Console.WriteLine(string.Join(", ", UnitConversion.UnitMap2.Keys));
+            Console.WriteLine();
+
+            return result;
+
+        }
     }
 }

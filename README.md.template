@@ -42,7 +42,7 @@ For example, we have an image: `1.png`
 Executing the command:
 
 ```
-imagetopdf 1.png -p a4 -m 1cmx1cm -r 300
+imagetopdf 1.png -p a5 -m 1cmx1cm -r 300 -o generated.pdf
 ```
 
 will create a `generated.pdf` file with an A4 page that contains the image at 300 pixels per inch, position at 1cm of the page borders.
@@ -50,6 +50,6 @@ will create a `generated.pdf` file with an A4 page that contains the image at 30
 Optionally a watermark can be set:
 
 ```
-imagetopdf 1.png -p a4 -m 1cmx1cm -r 300
+imagetopdf 1.png -p a4 -m 1cmx1cm -r 300 -o generated.pdf
 ```
 

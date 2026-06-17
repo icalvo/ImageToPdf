@@ -18,7 +18,7 @@ using SkiaSharp;
 // QuestPDF.Settings.License = LicenseType.Community;
 var fileArgument = new Argument<FileInfo>("File")
 {
-    Description = "Path to the file.",
+    Description = "Path to the file. If not provided, it will be a new temporary file path.",
     Arity = ArgumentArity.ExactlyOne
 };
 fileArgument.AcceptLegalFilePathsOnly();
@@ -33,7 +33,7 @@ fileArgument.Validators.Add(result =>
 
 var outputOption = new Option<FileInfo>("--output", ["-o"])
 {
-    DefaultValueFactory = _ => new FileInfo("generated.pdf"),
+    DefaultValueFactory = _ => new FileInfo(Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".pdf")),
     Arity = ArgumentArity.ExactlyOne,
     Description = "Path to save generated file"
 };
@@ -65,20 +65,24 @@ var resolutionOption = new Option<int?>("--resolution", ["-r"])
     Arity = ArgumentArity.ZeroOrOne,
     Description = "Resolution in dots per inch. This is one of the ways of indicating the image width in the page (the other is --width). It assumes that each pixel is a printer point and uses the printer resolution to deduce the physical width."
 };
-
 var watermarkOption = new Option<string?>("--watermark")
 {
     Arity = ArgumentArity.ZeroOrOne,
     Required = false,
-    Description = "Watermark text (optional)"
+    Description = "Watermark text"
 };
-
 var headerTextOption = new Option<string?>(
     "--header")
 {
-    Description = "Page header text (optional)",
+    Description = "Page header text",
     Arity = ArgumentArity.ZeroOrOne,
     Required = false,
+};
+var borderOption = new Option<Length?>("--border", ["-b"])
+{
+    CustomParser = ParseDimension,
+    Arity = ArgumentArity.ZeroOrOne,
+    Description = "Image border (e.g. 2mm, see available units below)"
 };
 
 
@@ -91,6 +95,7 @@ rootCommand.Options.Add(resolutionOption);
 rootCommand.Options.Add(watermarkOption);
 rootCommand.Options.Add(headerTextOption);
 rootCommand.Options.Add(pageSizeOption);
+rootCommand.Options.Add(borderOption);
 rootCommand.SetAction(Handle);
 
 var defaultHelpOption = rootCommand.Options.OfType<HelpOption>().FirstOrDefault();
@@ -111,25 +116,28 @@ void Handle(ParseResult parseResult)
     var resolution = parseResult.GetValue(resolutionOption);
     var width = parseResult.GetValue(widthOption);
     var pageSize = parseResult.GetRequiredValue(pageSizeOption);
+    var border = parseResult.GetValue(borderOption);
 
-    Length finalWidth = (resolution, width) switch
+    var imageBounds = SKBitmap.DecodeBounds(inputFile.FullName);
+    Rectangle finalSize = (resolution, width) switch
     {
         (null, null) => throw new Exception("Need one of --resolution of --width"),
-        (_, null) => new Length(SKBitmap.DecodeBounds(inputFile.FullName).Width / (float)resolution, Unit.Inch),
-        (null, _) => width,
+        (_, null) => new Rectangle(imageBounds.Width / (float)resolution, imageBounds.Height / (float)resolution, Unit.Inch),
+        (null, _) => new Rectangle(width.Quantity, width.Quantity * imageBounds.Height / imageBounds.Width, width.Unit),
         _ => throw new Exception("Need only one of --resolution of --width")
     };
-    Console.WriteLine("Final width: " + finalWidth);
-    var doc = GenerateDocument(inputFile, watermark, headerText, marginSize, finalWidth, pageSize);
+    Console.WriteLine("Final image size: " + finalSize);
+    Console.WriteLine("Output: " + outputFile.FullName);
+    var doc = GenerateDocument(inputFile, watermark, headerText, marginSize, finalSize, pageSize, border);
     doc.GeneratePdf(outputFile.FullName);
 }
 
-static Document GenerateDocument(FileInfo file, string? watermark, string? headerText, Rectangle marginSize, Length width, PageSize pageSize)
+static Document GenerateDocument(FileInfo file, string? watermark, string? headerText, Rectangle marginSize, Rectangle imageSize, PageSize pageSize, Length? borderOption)
     => Document.Create(container =>
-       container.Page(page =>
-           FillPage(page, file.FullName, headerText, watermark, marginSize, width, pageSize)));
+           container.Page(page =>
+               FillPage(page, file.FullName, headerText, watermark, marginSize, imageSize, pageSize, borderOption)));
 
-static void FillPage(PageDescriptor page, string filePath, string? headerText, string? watermark, Rectangle marginSize, Length width, PageSize pageSize)
+static void FillPage(PageDescriptor page, string filePath, string? headerText, string? watermark, Rectangle marginSize, Rectangle imageSize, PageSize pageSize, Length? border)
 {
     page.Size(pageSize);
     page.MarginTop(marginSize.Height, marginSize.Unit);
@@ -140,7 +148,9 @@ static void FillPage(PageDescriptor page, string filePath, string? headerText, s
     page.Content().Layers(layers =>
     {
         layers.PrimaryLayer()
-            .Width(width.Quantity, width.Unit)
+            .Width(imageSize.Width, imageSize.Unit)
+            .Height(imageSize.Height, imageSize.Unit)
+            .Border(border?.Quantity ?? 0, border?.Unit ?? Unit.Millimetre)
             .Image(filePath);
         FillWatermark(layers, watermark);
     });

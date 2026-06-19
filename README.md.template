@@ -1,5 +1,8 @@
 # ImageToPdf
 
+[![Build](https://github.com/icalvo/ImageToPdf/actions/workflows/main.yml/badge.svg)](https://github.com/icalvo/ImageToPdf/actions/workflows/main.yml)
+[![NuGet](https://img.shields.io/nuget/v/ImageToPdf.svg)](https://www.nuget.org/packages/ImageToPdf)
+
 .Net global tool for convert images to PDF document
 
 This tool uses an excellent library for generating pdf files called [QuestPDF](https://www.questpdf.com/).

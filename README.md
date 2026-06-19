@@ -54,7 +54,7 @@ Arguments:
   <File>  Path to the file. If not provided, it will be a new temporary file path.
 
 Options:
-  -o, --output <output>                 Path to save generated file [default: C:\Users\Administrator\AppData\Local\Temp\zvntpj2y.0v2.pdf]
+  -o, --output <output>                 Path to save generated file. [default: temp file path that will be printed to console]
   -m, --margin <margin> (REQUIRED)      Left and top margin sizes, to position the image (e.g. '5mmx7mm', see available units below)
   -w, --width <width>                   Image width. This is one of the ways of indicating the physical width of the image (the other is --resolution)
   -r, --resolution <resolution>         Resolution in dots per inch. This is one of the ways of indicating the image width in the page (the other is --width). It assumes that each pixel is a printer point and uses the printer resolution to deduce the physical width.

@@ -32,11 +32,10 @@ fileArgument.Validators.Add(result =>
     }
 });
 
-var outputOption = new Option<FileInfo>("--output", ["-o"])
+var outputOption = new Option<FileInfo?>("--output", ["-o"])
 {
-    DefaultValueFactory = _ => new FileInfo(Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".pdf")),
-    Arity = ArgumentArity.ExactlyOne,
-    Description = "Path to save generated file"
+    Arity = ArgumentArity.ZeroOrOne,
+    Description = "Path to save generated file. [default: temp file path that will be printed to console]"
 };
 outputOption.AcceptLegalFilePathsOnly();
 
@@ -110,7 +109,8 @@ return 0;
 void Handle(ParseResult parseResult)
 {
     var inputFile = parseResult.GetRequiredValue(fileArgument);
-    var outputFile = parseResult.GetRequiredValue(outputOption);
+    var outputFile = parseResult.GetValue(outputOption)
+        ?? new FileInfo(Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".pdf"));
     var watermark = parseResult.GetValue(watermarkOption);
     var headerText = parseResult.GetValue(headerTextOption);
     var marginSize = parseResult.GetRequiredValue(marginOption);

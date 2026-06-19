@@ -1,4 +1,5 @@
 ﻿#:property PackageLicenseExpression=MIT
+#:property Version=1.2.0
 #:package QuestPDF@*
 #:package SkiaSharp@*
 #:package System.CommandLine@*

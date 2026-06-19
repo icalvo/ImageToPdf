@@ -1,43 +1,61 @@
-# This is a basic workflow to help you get started with Actions
-
 name: Publish to nuget
 
-# Controls when the workflow will run
 on:
-  # Allows you to run this workflow manually from the Actions tab
-  workflow_dispatch:
-    inputs:
-      version:
-        description: "Version"
-        required: true
-        type: string
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+  push:
+    branches:
+      - main
+
 jobs:
-  # This workflow contains a single job called "build-and-publish"
   build-and-publish:
     permissions:
-      id-token: write # enable GitHub OIDC token issuance for this job
-    # The type of runner that the job will run on
+      id-token: write
     runs-on: ubuntu-latest
 
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v6
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 10.0.x
-      - name: Pack
-        run: dotnet pack -c Release ImageToPdf.cs --version ${{ github.event.inputs.version }} -o .
 
-      # Get a short-lived NuGet API key
+      - name: Check version
+        id: version
+        run: |
+          LOCAL_VERSION=$(grep -E '^#:property Version=' ImageToPdf.cs | head -1 | sed 's/.*=//')
+          if [ -z "$LOCAL_VERSION" ]; then
+            echo "No version found in ImageToPdf.cs" >&2
+            exit 1
+          fi
+
+          LATEST=$(curl -sf https://api.nuget.org/v3-flatcontainer/imagetopdf/index.json | jq -r '.versions | last // empty')
+
+          if [ -z "$LATEST" ]; then
+            SHOULD_PUBLISH=true
+          elif [ "$(printf '%s\n%s' "$LATEST" "$LOCAL_VERSION" | sort -V | tail -n1)" = "$LOCAL_VERSION" ] && [ "$LOCAL_VERSION" != "$LATEST" ]; then
+            SHOULD_PUBLISH=true
+          else
+            SHOULD_PUBLISH=false
+          fi
+
+          echo "local_version=$LOCAL_VERSION" >> "$GITHUB_OUTPUT"
+          echo "latest_published=$LATEST" >> "$GITHUB_OUTPUT"
+          echo "should_publish=$SHOULD_PUBLISH" >> "$GITHUB_OUTPUT"
+          echo "Local version: $LOCAL_VERSION"
+          echo "Latest on nuget.org: ${LATEST:-none}"
+          echo "Should publish: $SHOULD_PUBLISH"
+
+      - name: Pack
+        if: steps.version.outputs.should_publish == 'true'
+        run: dotnet pack -c Release ImageToPdf.cs -o .
+
       - name: NuGet login (OIDC → temp API key)
+        if: steps.version.outputs.should_publish == 'true'
         uses: NuGet/login@v1
         id: login
         with:
           user: ${{ secrets.NUGET_USER }}
 
       - name: Publish NuGet
-        run: dotnet nuget push *.nupkg --api-key ${{steps.login.outputs.NUGET_API_KEY}} --source "https://api.nuget.org/v3/index.json" --skip-duplicate
+        if: steps.version.outputs.should_publish == 'true'
+        run: dotnet nuget push *.nupkg --api-key ${{ steps.login.outputs.NUGET_API_KEY }} --source "https://api.nuget.org/v3/index.json" --skip-duplicate

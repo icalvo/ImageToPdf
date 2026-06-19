@@ -29,9 +29,7 @@ dotnet tool uninstall ImageToPdf --global
 
 ## Publishing
 
-Releases are published automatically to [nuget.org](https://www.nuget.org/packages/ImageToPdf) when a new version is pushed to `main`. To publish a release, bump the `Version` property in `ImageToPdf.cs` to a value higher than the latest version on NuGet, then push to `main`. The GitHub Actions workflow compares the version in the repository with the latest published package and only deploys when the local version is newer.
-
-To list currently published versions locally, run `Get-Versions.ps1`.
+Releases are published automatically to [nuget.org](https://www.nuget.org/packages/ImageToPdf) when a new version is pushed to `main`. To publish a release, run `Publish.ps1`: it lists published versions, bumps the `Version` property in `ImageToPdf.cs`, and pushes to `main`. The GitHub Actions workflow compares the version in the repository with the latest published package, publishes when the local version is newer, and tags the commit with the version number.
 
 ## Usage
 
